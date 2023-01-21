@@ -173,3 +173,25 @@ from
 where
   source_data->'name' = 'product';
 
+
+-- all entities in a path
+
+drop view entities_in_path;
+create view entities_in_path as
+select e.*, source.id as source_id
+from entity e, entity source
+where e.id in
+(
+    -- in tree
+    select
+        unnest(string_to_array(ltree2text(path), '.')) as id
+    from hierarchy
+    where entity_id=source.id
+
+    union
+    select
+        source.id as id
+);
+
+select * from entities_in_path
+where source_id = 'dev';
