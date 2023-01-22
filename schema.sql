@@ -195,3 +195,67 @@ where e.id in
 
 select * from entities_in_path
 where source_id = 'dev';
+
+-- find elements that are in a tree ancestry, i.e. have descendants
+drop view descendants;
+create view descendants as
+select
+    unnest(string_to_array(ltree2text(path), '.')) as id,
+    h.*
+from hierarchy h
+group by (id, h.type, h.path, h.entity_id);
+
+-- all descendants of product
+select d.*, e.type
+from descendants d
+inner join entity e on e.id = d.entity_id
+where d.id = 'product';
+
+
+-- moving hierarchies
+
+--- find descendant hierarchy entries
+select
+    *
+from
+    hierarchy
+where
+    type='multidisc'
+and path <@ 'org.travel';
+
+--- update descendant hierarchy entries
+update
+    hierarchy
+set
+    path = 'org.product' || CASE nlevel(path) > nlevel('org.travel')
+        WHEN 't' THEN
+            subpath(path, nlevel('org.travel'))
+        ELSE ''
+    END
+where
+    type='multidisc'
+and path <@ 'org.travel';
+
+
+
+create or replace function replace_path (hierarchy_type text, old_path ltree, new_path ltree)
+returns integer
+language plpgsql as $$
+declare
+    updated_rows integer;
+begin
+    update
+        hierarchy
+    set
+        path = new_path || CASE nlevel(path) > nlevel(old_path)
+            WHEN 't' THEN
+                subpath(path, nlevel(old_path))
+            ELSE ''
+        END
+    where
+        type=hierarchy_type
+    and path <@ old_path;
+    GET DIAGNOSTICS updated_rows := ROW_COUNT;
+    return updated_rows;
+end
+$$;
