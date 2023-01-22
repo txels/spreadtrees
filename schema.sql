@@ -42,12 +42,14 @@ insert into entity values('joe', 'person', 'name => joe, level => 2');
 insert into entity values('dev', 'team', 'name => dev, tier => 2, cost=>12');
 insert into entity values('design', 'team', 'name => design, tier => 2, cost=>23');
 insert into entity values('product', 'team', 'name => product, tier => 1');
+insert into entity values('other', 'team', 'name => other, tier => 1');
 insert into entity values('org', 'team', 'name => org, tier => 0');
 
 
 truncate table hierarchy;
 -- teams
 insert into hierarchy values ('multidisc', 'org', 'product');
+insert into hierarchy values ('multidisc', 'org', 'other');
 insert into hierarchy values ('multidisc', 'org.product', 'design');
 insert into hierarchy values ('multidisc', 'org.product', 'dev');
 -- people in teams
@@ -238,7 +240,7 @@ and path <@ 'org.travel';
 
 
 
-create or replace function replace_path (hierarchy_type text, old_path ltree, new_path ltree)
+create or replace function hierarchy_move(hierarchy_type text, old_path ltree, new_path ltree)
 returns integer
 language plpgsql as $$
 declare
@@ -259,3 +261,36 @@ begin
     return updated_rows;
 end
 $$;
+
+create or replace function entity_move(entity_id text, hierarchy_type text, new_path ltree)
+returns integer
+language plpgsql as $$
+declare
+    updated_rows integer;
+    old_path ltree;
+    source_id text := entity_id;
+begin
+    old_path := (
+        select path from hierarchy h
+        where
+            type = hierarchy_type
+        and h.entity_id = source_id
+    );
+    -- update direct record
+    update hierarchy h
+        set path = new_path
+        where
+            type = hierarchy_type
+        and h.entity_id = source_id;
+    -- update all descendants
+    updated_rows := (
+        select hierarchy_move(
+            hierarchy_type,
+            old_path||source_id,
+            new_path||source_id)
+    );
+    return updated_rows + 1; -- +1 being the direct record update
+end
+$$;
+
+-- e.g. select entity_move('design', 'multidisc', 'org.other');
