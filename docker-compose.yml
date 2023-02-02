@@ -7,7 +7,7 @@ services:
   # Data layer ----------------------------------------------------------------------
 
   db:
-    image: postgres:11
+    image: postgres:15.1
     volumes:
       - postgres-data:/var/lib/postgresql/data/
     environment:
