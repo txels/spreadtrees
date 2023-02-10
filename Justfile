@@ -4,5 +4,5 @@ default:
 run:
 	docker-compose up
 
-psql:
-	docker-compose exec db psql -Upostgres
+psql *args:
+    PGHOST=localhost psql -Upostgres {{args}}

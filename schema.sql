@@ -13,10 +13,14 @@ create extension if not exists ltree;
 create table if not exists entity (
     id text not null primary key,
     type text not null,
-    data hstore
+    data jsonb
+    -- data hstore
 );
 
-create index if not exists entity_data_gist on entity using gist (data);
+-- convert hstore to jsonb:
+-- alter table entity alter data type jsonb using data::jsonb;
+
+-- create index if not exists entity_data_gist on entity using gist (data);
 create index if not exists entity_data_gin on entity using gin (data);
 
 
@@ -26,6 +30,7 @@ create table if not exists hierarchy (
     entity_id text not null references entity(id) on delete cascade
 );
 
+-- TODO: multi-valued hierarchies/relations? E.g one person many teams
 -- add constraint for hierarchy (type, path, entity_id)
 alter table hierarchy add constraint no_duplicates
 unique nulls not distinct (type, path, entity_id);
@@ -95,7 +100,7 @@ $$ LANGUAGE SQL;
 -- (e.g. name = 'bob')
 -- could be made simpler if we include the leaf in the path,
 -- but this may make other queries more complicated
-drop view entity_relations;
+drop view if exists entity_relations;
 create view entity_relations as
 select
     e.*,
@@ -117,7 +122,7 @@ where
 
 
 -- all entities in a path
-drop view entities_in_path;
+drop view if exists entities_in_path;
 create view entities_in_path as
 select e.*, source.id as source_id
 from entity e, entity source
@@ -135,7 +140,7 @@ where e.id in
 );
 
 -- elements that are in a tree ancestry, i.e. have descendants
-drop view descendants;
+drop view if exists descendants;
 create view descendants as
 select
     unnest(string_to_array(ltree2text(path), '.')) as id,
@@ -144,7 +149,7 @@ from hierarchy h
 group by (id, h.type, h.path, h.entity_id);
 
 -- joins hierarchy and entities as a tree of entities
-drop view entity_tree;
+drop view if exists entity_tree;
 create view entity_tree as
 select h.type as hierarchy_type, h.path, e.* from hierarchy h
 inner join entity e on e.id = h.entity_id;

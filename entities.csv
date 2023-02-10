@@ -1,0 +1,32 @@
+sfw	ownership	{"name": "Software Engineering"}
+use	ownership	{"name": "Usability"}
+acc	ownership	{"name": "Accessibility"}
+ux	ownership	{"name": "UX"}
+dx	ownership	{"name": "Developer Experience"}
+api	ownership	{"name": "API design"}
+pla	ownership	{"name": "Platform"}
+del	ownership	{"name": "Continuous Delivery"}
+bob	person	{"name": "bob", "level": 2}
+jan	person	{"name": "jan", "level": 2}
+joe	person	{"name": "joe", "level": 2}
+json	person	{"name": "json", "level": 2}
+dev	team	{"cost": "12", "name": "dev", "tier": 2}
+design	team	{"cost": "23", "name": "design", "tier": 2}
+product	team	{"name": "product", "tier": 1}
+other	team	{"name": "other", "tier": 1}
+org	team	{"name": "org", "tier": 0}
+ci	ownership	{"name": "Continuous Integration"}
+bab	person	{"name": "bob", "level": "1"}
+bib	person	{"name": "bob", "level": "1"}
+sarah	person	{"name": "sarah", "level": 2}
+anna	person	{"name": "anna", "level": 2}
+laura	person	{"name": "laura", "level": 2}
+carles	person	{"name": "carles", "level": 2}
+mark	person	{"name": "mark", "level": 1}
+meg	person	{"name": "meg", "level": 1}
+steph	person	{"name": "steph", "level": 1}
+dsg	team	{"name": "design", "tier": 1}
+eng	team	{"name": "eng", "tier": 1}
+ops	team	{"name": "ops", "tier": 1}
+os	team	{"name": "os", "tier": 0}
+pro	team	{"name": "product", "tier": 1}
