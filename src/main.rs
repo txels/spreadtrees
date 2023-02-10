@@ -1,6 +1,9 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt};
 
-use tokio_postgres::{types::*, Error, NoTls, Row};
+use include_postgres_sql::{impl_sql, include_sql};
+use tokio_postgres::{types::*, Client, Error, NoTls, Row};
+
+include_sql!("sql/queries.sql");
 
 #[derive(Clone, Debug)]
 struct Ltree(String);
@@ -60,20 +63,38 @@ impl From<&Row> for Entity {
     }
 }
 
-#[tokio::main] // By default, tokio_postgres uses the tokio crate as its runtime.
-async fn main() -> Result<(), Error> {
-    // Connect to the database.
-    let (client, connection) =
-        tokio_postgres::connect("host=localhost user=postgres", NoTls).await?;
+#[derive(Debug)]
+struct Related {
+    id: String,
+    relation: String,
+    path: String,
+    related_id: String,
+    related_type: String,
+}
 
-    // The connection object performs the actual communication with the database,
-    // so spawn it off to run on its own.
-    tokio::spawn(async move {
-        if let Err(e) = connection.await {
-            eprintln!("connection error: {}", e);
+impl From<&Row> for Related {
+    fn from(row: &Row) -> Self {
+        Related {
+            id: row.get("id"),
+            relation: row.get("relation"),
+            path: row.get("path"),
+            related_id: row.get("related_id"),
+            related_type: row.get("related_type"),
         }
-    });
+    }
+}
 
+impl fmt::Display for Related {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "id={} rel={}:{} related={}:{}",
+            self.id, self.relation, self.path, self.related_type, self.related_id,
+        )
+    }
+}
+
+async fn direct_queries(client: &Client) -> Result<(), Error> {
     let rows = client
         .query("SELECT id, type, data from entity", &[])
         .await?;
@@ -91,6 +112,44 @@ async fn main() -> Result<(), Error> {
         let hier: Hierarchy = Hierarchy::from(&row);
         println!("{:?}", hier);
     }
+
+    Ok(())
+}
+
+async fn include_queries(client: &Client) -> Result<(), Error> {
+    println!("Children");
+    client
+        .get_children("bob", |row| {
+            println!("{}", Related::from(&row));
+            Ok(())
+        })
+        .await?;
+    println!("Siblings");
+    client
+        .get_siblings("bob", |row| {
+            println!("{}", Related::from(&row));
+            Ok(())
+        })
+        .await?;
+    Ok(())
+}
+
+#[tokio::main] // By default, tokio_postgres uses the tokio crate as its runtime.
+async fn main() -> Result<(), Error> {
+    // Connect to the database.
+    let (client, connection) =
+        tokio_postgres::connect("host=localhost user=postgres", NoTls).await?;
+
+    // The connection object performs the actual communication with the database,
+    // so spawn it off to run on its own.
+    tokio::spawn(async move {
+        if let Err(e) = connection.await {
+            eprintln!("connection error: {}", e);
+        }
+    });
+
+    // direct_queries(&client).await?;
+    include_queries(&client).await?;
 
     Ok(())
 }
