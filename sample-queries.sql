@@ -362,3 +362,16 @@ from
   , lateral children (e.id) h
     inner join entity e2 on h.entity_id = e2.id
 ;
+
+-- join hierarchy with parent
+select
+    hierarchy.id
+  , entity_id
+  , hierarchy.type as relation
+  , _bottom (path) as parent_id
+  , entity.type    as parent_type
+  , entity.data    as parent_data
+from
+    hierarchy
+    join entity on entity.id = _bottom (path)
+;
