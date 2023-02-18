@@ -1,1 +1,6 @@
 /target
+account-statement*.csv
+bankinter.csv
+bankinter.xls
+.~lock.*
+*.ipynb
