@@ -1,1 +1,1 @@
-just psql -f data-demo.sql -f data-ourspace.sql
+just psql -f sql/data-demo.sql -f sql/data-ourspace.sql
