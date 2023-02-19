@@ -39,11 +39,11 @@ unique nulls not distinct (type, path, entity_id);
 
 create index if not exists hierarchy_path_gist_idx
     on hierarchy
-    using gist (path);
+    using gist(path);
 
 create index if not exists hierarchy_path_idx
     on hierarchy
-    using btree (path);
+    using btree(path);
 
 
 -- drop table changelog;
@@ -63,11 +63,31 @@ create index if not exists changelog_entity_id
     using btree (entity_id);
 
 
+-- drop table catalog
+create table if not exists catalog (
+    id serial primary key,
+    name text not null,
+    value text not null,
+    data jsonb
+);
+
+alter table catalog add constraint catalag_no_duplicates
+unique (name, value);
+
+-- create index if not exists entity_data_gist on entity using gist (data);
+create index if not exists catalog_data_gin
+    on catalog
+    using gin(data);
+create index if not exists catalog_name_btree
+    on catalog
+    using btree(name);
+
+
 --- functions and triggers ---
 
 -- update descendants (to be called by trigger)
-create or replace function _update_descendants_hierarchy_path() returns trigger as
-$$
+create or replace function _update_descendants_hierarchy_path() returns trigger
+as $$
 begin
     update hierarchy
        set path = NEW.path || CASE nlevel(hierarchy.path) > nlevel(OLD.path)
@@ -91,8 +111,8 @@ create trigger hierarchy_path_autoupdate
 
 
 -- record hierarchy change (move) - (to be called by trigger)
-create or replace function _record_hierarchy_change() returns trigger as
-$$
+create or replace function _record_hierarchy_change() returns trigger
+as $$
 -- argv[0] is text "hierarchy change type"
 begin
     insert into changelog(event, entity_id, change_data)
@@ -110,7 +130,8 @@ end;
 $$ language plpgsql;
 
 
-create or replace function _bottom(path ltree) returns text as $$
+create or replace function _bottom(path ltree) returns text
+as $$
     select subpath(path, -1, 1)::text;
 $$ language sql;
 
@@ -140,8 +161,10 @@ create trigger record_hierarchy_delete
 ;
 
 
-create or replace function siblings(source_id text) returns setof hierarchy as $$
-    with element as (
+create or replace function siblings(source_id text) returns setof hierarchy
+as $$
+    with element
+    as (
         select *
         from hierarchy
         where entity_id = source_id
@@ -152,15 +175,44 @@ create or replace function siblings(source_id text) returns setof hierarchy as $
 $$ language sql;
 
 
-create or replace function children(source_id text) returns setof hierarchy as $$
+create or replace function children(source_id text) returns setof hierarchy
+as $$
     select h.* from hierarchy h where h.path ~ ('*.' || source_id)::lquery;
 $$ language sql;
 
 
-create or replace function descendants(source_id text) returns setof hierarchy as $$
+create or replace function descendants(source_id text) returns setof hierarchy
+as $$
     select h.* from hierarchy h where h.path ~ ('*.' || source_id || '.*')::lquery;
 $$ language sql;
 
+
+drop function fetch_property;
+create or replace function fetch_property(property text)
+    returns table(
+        entity_id text,
+        entity_type text,
+        entity_data jsonb,
+        hierarchy_type text,
+        path ltree,
+        value text,
+        property_data jsonb
+    )
+as $$
+    select
+        e.id as entity_id,
+        e.type as entity_type,
+        e.data as entity_data,
+        h.type as hierarchy_type,
+        h.path,
+        e.data->>property as value,
+        c.data as property_data
+    from
+        entity e
+        join hierarchy h on h.entity_id = e.id
+        left join catalog c on e.data->>property=c.value and c.name=property
+    where e.data?property;
+$$ language sql;
 
 --- views ---
 

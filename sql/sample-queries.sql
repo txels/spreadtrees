@@ -375,3 +375,66 @@ from
     hierarchy
     join entity on entity.id = _bottom (path)
 ;
+
+
+-- catalog matches
+
+select
+    e.id, e.data->>'name' name, c.data->>'score' score
+from
+    entity e
+    left join catalog c on e.data->>'seniority'=c.value and c.name='seniority'
+where e.data?'seniority'
+order by score desc;
+
+-- aggregates by catalog values
+create view seniority_value as
+select
+    e.id,
+    e.data->>'name' as name,
+    h.type,
+    h.path,
+    c.data as seniority_data
+from
+    entity e
+    join hierarchy h on h.entity_id = e.id
+    left join catalog c on e.data->>'seniority'=c.value and c.name='seniority'
+where e.data?'seniority';
+
+
+select
+    type,
+    path,
+    sum((seniority_data->>'score')::int)
+from seniority_value
+group by type, path;
+
+select
+    path,
+    count(*) filter(where value='F') as female,
+    count(*) filter(where value='M') as male,
+    count(*) filter(where not value=any('{M,F}')) as other
+from fetch_property('gender')
+where
+    hierarchy_type = 'multidisc'
+    and entity_type='person'
+group by path;
+
+
+with genders as (
+    select
+        path,
+        count(*) filter(where value='F') as female,
+        count(*) filter(where value='M') as male,
+        count(*) filter(where not value=any('{M,F}')) as other,
+        array_agg(entity_id) as people
+    from fetch_property('gender')
+    where
+        hierarchy_type = 'multidisc'
+        and entity_type='person'
+    group by path
+)
+select
+    path, people, female, male,
+    trunc(least(female, male)::decimal / greatest(female, male), 2) as ratio
+from genders;
