@@ -24,8 +24,7 @@ create table if not exists revision (
 create table if not exists revision_entity (
     revision_id uuid not null references revision(id) on delete cascade,
     entity_id text not null,
-    entity_version uuid not null,
-    FOREIGN KEY (entity_id, entity_version) REFERENCES entity_version (id, version)
+    entity_version uuid not null
 );
 
 
@@ -109,6 +108,19 @@ as $$
 $$ language plpgsql;
 
 
+create or replace function revision_entities(branch_revision uuid)
+returns setof entity_version
+as $$
+    select e.*
+    from entity_version e
+    join revision_entity re
+        on re.entity_id = e.id
+        and re.entity_version = e.version
+    where re.revision_id = branch_revision;
+$$ language sql;
+
+
+
 --- Example queries/updates
 
 -- populate versioned from non-versioned entities
@@ -163,3 +175,51 @@ entities as (
 )
 insert into revision_entity (revision_id, entity_id, entity_version)
 select '98f18a8c-085b-4163-bc3e-798ce66dfc78', id, version from entities;
+
+
+-- update an object in a revision
+
+with old_version as (
+    select * from revision_entity
+    where revision_id = 'e023b52c-2ae1-4311-b03a-710250b693ba'
+    and entity_id = 'bob'
+),
+new_version as (
+    update entity_version
+    set data['critical']='false'
+    where (id, version) in (
+        select entity_id, entity_version from old_version
+    )
+    returning id, version
+)
+update revision_entity
+set entity_version = (select version from new_version)
+where (revision_id, entity_id) = (select revision_id, entity_id from old_version);
+
+
+create or replace function set_field_in_revision(
+    branch_id uuid,
+    source_entity_id text,
+    field text,
+    value jsonb
+)
+returns setof revision_entity
+as $$
+    with old_version as (
+        select * from revision_entity
+        where revision_id = branch_id
+        and entity_id = source_entity_id
+    ),
+    new_version as (
+        update entity_version
+        set data[field]=value
+        where (id, version) in (
+            select entity_id, entity_version from old_version
+        )
+        returning id, version
+    )
+    update revision_entity
+    set entity_version = (select version from new_version)
+    where (revision_id, entity_id) = (select revision_id, entity_id from old_version)
+    returning revision_entity.*;
+$$ language sql;
