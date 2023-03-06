@@ -15,6 +15,18 @@ create index if not exists entity_version_data
     on entity_version
     using gin(data);
 
+create table if not exists revision (
+    id uuid primary key not null default gen_random_uuid(),
+    name text,
+);
+
+create table if not exists revision_entity (
+    revision_id uuid not null references revision(id) on delete cascade,
+    entity_id text not null,
+    entity_version uuid not null,
+    FOREIGN KEY (entity_id, entity_version) REFERENCES entity_version (id, version)
+);
+
 
 --- functions and triggers ---
 
@@ -65,6 +77,16 @@ as $$
     limit 1;
 $$ language sql;
 
+create or replace function latest_entity_versions()
+returns setof entity_version
+as $$
+select
+    distinct on (id)
+    *
+from entity_version
+order by id, updated_at desc;
+$$ language sql;
+
 
 --- Example queries/updates
 
@@ -101,3 +123,22 @@ from
 ;
 
 
+-- latest versions for all entities
+
+select
+    distinct on (id)
+    id, version, updated_at, data
+from entity_version
+order by id, updated_at desc;
+
+
+--- create initial "main" revision with current latest versions
+
+insert into revision (id) values (gen_random_uuid());
+
+with
+entities as (
+    select id, version from latest_entity_versions()
+)
+insert into revision_entity (revision_id, entity_id, entity_version)
+select '98f18a8c-085b-4163-bc3e-798ce66dfc78', id, version from entities;
