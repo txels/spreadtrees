@@ -17,6 +17,7 @@ create index if not exists entity_version_data
 
 create table if not exists revision (
     id uuid primary key not null default gen_random_uuid(),
+    parent uuid references revision(id),
     name text,
 );
 
@@ -86,6 +87,26 @@ select
 from entity_version
 order by id, updated_at desc;
 $$ language sql;
+
+
+create or replace function branch(parent_id uuid)
+returns uuid
+as $$
+    declare new_id uuid;
+
+    begin
+       with revision as (
+            insert into revision (parent)
+            values(parent_id)
+            returning id
+        ) select id from revision into new_id;
+
+        insert into revision_entity (revision_id, entity_id, entity_version)
+        (select new_id, ev.entity_id, ev.entity_version from revision_entity ev where revision_id = parent_id);
+
+        return new_id;
+    end
+$$ language plpgsql;
 
 
 --- Example queries/updates
