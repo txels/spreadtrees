@@ -421,6 +421,7 @@ where
 group by path;
 
 
+create or replace view team_stats as
 with genders as (
     select
         path,
@@ -436,5 +437,28 @@ with genders as (
 )
 select
     path, people, female, male,
-    trunc(least(female, male)::decimal / greatest(female, male), 2) as ratio
+    trunc(least(female, male) * 100 / greatest(female, male))::int as gender_balance,
+    trunc(female * 100 / (female + male + other))::int as pct_female,
+    trunc(male * 100 / (female + male + other))::int as pct_male
 from genders;
+
+
+select
+    entity_id, 
+    repeat( text '■', (property_data->>'score')::int) as seniority
+from fetch_property('seniority');
+
+
+create or replace function bar(length numeric) returns text
+as $$
+    select repeat( text '■', trunc(length)::int);
+$$ language sql;
+
+select
+    path, 
+    bar(gender_balance/10) as balance,
+    bar(pct_male/10) as pct_male,
+    bar(pct_female/10) as pct_female
+from team_stats;
+
+select entity_id, bar((property_data->>'score')::int) from fetch_property('seniority');

@@ -218,3 +218,20 @@ select
   , extract(day from day) as day_of_month
   from d;
 ```
+
+
+## Schemas
+
+```sql
+-- list schemas, change owner
+\dn
+create role f1db login;
+alter database f1db owner to f1db;
+alter schema f1db owner to f1db;
+
+-- connect to db as user
+\c f1db f1db
+-- determine schema search path
+show search_path;
+set search_path = f1db, public;
+```
