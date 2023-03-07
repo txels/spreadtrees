@@ -120,6 +120,35 @@ as $$
 $$ language sql;
 
 
+create or replace function set_field_in_revision(
+    branch_id uuid,
+    source_entity_id text,
+    field text,
+    value jsonb
+)
+returns setof revision_entity
+as $$
+    with old_version as (
+        select * from revision_entity
+        where revision_id = branch_id
+        and entity_id = source_entity_id
+    ),
+    new_version as (
+        update entity_version
+        set data[field]=value
+        where (id, version) in (
+            select entity_id, entity_version from old_version
+        )
+        returning id, version
+    )
+    update revision_entity
+    set entity_version = (select version from new_version)
+    where (revision_id, entity_id) = (select revision_id, entity_id from old_version)
+    returning revision_entity.*;
+$$ language sql;
+
+
+
 
 --- Example queries/updates
 
@@ -197,29 +226,6 @@ set entity_version = (select version from new_version)
 where (revision_id, entity_id) = (select revision_id, entity_id from old_version);
 
 
-create or replace function set_field_in_revision(
-    branch_id uuid,
-    source_entity_id text,
-    field text,
-    value jsonb
-)
-returns setof revision_entity
-as $$
-    with old_version as (
-        select * from revision_entity
-        where revision_id = branch_id
-        and entity_id = source_entity_id
-    ),
-    new_version as (
-        update entity_version
-        set data[field]=value
-        where (id, version) in (
-            select entity_id, entity_version from old_version
-        )
-        returning id, version
-    )
-    update revision_entity
-    set entity_version = (select version from new_version)
-    where (revision_id, entity_id) = (select revision_id, entity_id from old_version)
-    returning revision_entity.*;
-$$ language sql;
+-- query revisions
+
+select * from revision_entities('98f18a8c-085b-4163-bc3e-798ce66dfc78') order by id;
