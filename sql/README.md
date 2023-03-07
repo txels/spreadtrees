@@ -6,7 +6,7 @@ Optional extensions to the model include versioning and catalogs (for property v
 
 ## Entities
 
-Entities have an id, a type (text) and free-form data (jsonb).
+Entities have an `id`, a `type` (text) and free-form `data` (jsonb).
 
 ### Schema driven by application code
 
@@ -16,7 +16,9 @@ This means the schema must be enforced (if needed) at the application level, whi
 
 ## Relations (and Hierarchies)
 
-Relations have an id, a type, a path.
+Relations have an `id`, a `type`, a `path` and an `entity_id` (the _target_ of the relationship).
+
+`path` is the full hierarchical path to the _source_ entity of the relationship (although relations are not necessarily directional, so I'm using source and target rather arbitrarily here).
 
 > DB table is currently called `hierarchy`.
 
@@ -29,11 +31,11 @@ The id is currently there only for simpler addressability, but maybe a preserved
 
 ## Values and catalogs
 
-With data in entity being just JSON, how do we encode non-primitive values that have meaning in a normalised way? E.g. we may have a "seniority" property that is a label but can convey some associated properties (like e.g. rank). Or how do we handle "selector-style" properties, where values are only well known set? We could do this fully in application code, but we can offer some support.
+With data in entity being just JSON, how do we encode non-primitive values that have meaning in a normalised way? E.g. we may have a "seniority" property that is a label but can convey some associated properties (like e.g. rank). Or how do we handle "enumerated" properties, where valid values are only from a well known set? We could do this fully in application code, but the data model can offer some support.
 
 Enter catalogs.
 
-A catalog entry contains an id (which might not be necessary), a (property) name, a value and data. (name, value) pairs are unique.
+A catalog entry contains an `id` (which might not be necessary), a (property) `name`, a `value` and data. `(name, value)` pairs are unique.
 
 Catalogs allow us to keep a meaningful property value in the entity that can be shown to users (and thus not require to always perform a lookup), while allowing us to look up the associated data when needed (e.g. to compute things like sort by hierarchy rank/value or compute aggregated scorecards based on those within the DB - thus making the database data/app layer accessible to multiple applications in a programming language-agnostic way).
 
