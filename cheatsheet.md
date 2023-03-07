@@ -219,7 +219,6 @@ select
   from d;
 ```
 
-
 ## Schemas
 
 ```sql
@@ -234,4 +233,14 @@ alter schema f1db owner to f1db;
 -- determine schema search path
 show search_path;
 set search_path = f1db, public;
+```
+
+## Clone tables
+
+```sql
+-- copy schema, indices and constraints...
+-- (does not include triggers though, nor associated functions):
+CREATE TABLE <newname> (LIKE <oldname> INCLUDING ALL);
+-- copy data
+INSERT INTO <newname> SELECT * FROM <oldname>;
 ```
