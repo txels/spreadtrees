@@ -1,18 +1,18 @@
 -- truncate table entity;
 
-insert into entity values('sarah', 'person', '{"name": "sarah", "level": 2}');
-insert into entity values('anna', 'person', '{"name": "anna", "level": 2}');
-insert into entity values('laura', 'person', '{"name": "laura", "level": 2}');
-insert into entity values('carles', 'person', '{"name": "carles", "level": 2}');
-insert into entity values('mark', 'person', '{"name": "mark", "level": 1}');
-insert into entity values('meg', 'person', '{"name": "meg", "level": 1}');
-insert into entity values('steph', 'person', '{"name": "steph", "level": 1}');
+insert into entity(id, type, data) values('sarah', 'person', '{"name": "sarah", "level": 2}');
+insert into entity(id, type, data) values('anna', 'person', '{"name": "anna", "level": 2}');
+insert into entity(id, type, data) values('laura', 'person', '{"name": "laura", "level": 2}');
+insert into entity(id, type, data) values('carles', 'person', '{"name": "carles", "level": 2}');
+insert into entity(id, type, data) values('mark', 'person', '{"name": "mark", "level": 1}');
+insert into entity(id, type, data) values('meg', 'person', '{"name": "meg", "level": 1}');
+insert into entity(id, type, data) values('steph', 'person', '{"name": "steph", "level": 1}');
 
-insert into entity values('dsg', 'team', '{"name": "design", "tier": 1}');
-insert into entity values('eng', 'team', '{"name": "eng", "tier": 1}');
-insert into entity values('ops', 'team', '{"name": "ops", "tier": 1}');
-insert into entity values('os', 'team', '{"name": "os", "tier": 0}');
-insert into entity values('pro', 'team', '{"name": "product", "tier": 1}');
+insert into entity(id, type, data) values('dsg', 'team', '{"name": "design", "tier": 1}');
+insert into entity(id, type, data) values('eng', 'team', '{"name": "eng", "tier": 1}');
+insert into entity(id, type, data) values('ops', 'team', '{"name": "ops", "tier": 1}');
+insert into entity(id, type, data) values('os', 'team', '{"name": "os", "tier": 0}');
+insert into entity(id, type, data) values('pro', 'team', '{"name": "product", "tier": 1}');
 
 
 -- truncate table hierarchy;

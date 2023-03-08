@@ -47,14 +47,14 @@ Catalogs allow us to keep a meaningful property value in the entity that can be 
 
 Versioning is inspired by git but is a simpler model, intended to handle "branches" that are drafts, but within a branch there is no concept of multiple commits (ATM) as individual addressable operations. So multiple versions of an entity within a branch are not recorded ATM. They could be reconstructed by recording a linear sequence of change events that contain the individual changes.
 
-Versioning includes:
+[Versioning](./versioning.sql) includes:
 
-- `entity_version` (versioned entity): Enitities that have an id `plus` a `version` (new versions generated automatically upon update using "copy on save"), intended to replace `entity`.
+- Additions to `entity` (versioned entity): Enitities that have an id `plus` a `version` (new versions generated automatically upon update using "copy on save"), intended to replace `entity`.
 -
 
 Parallels with the `git` model:
 
-- `entity_version` is similar to `blob`, but unlike blobs, entities do have an identity (encoded their `id`). In git there isn't as much an "identity of a file", this is recorded as the entry of the blob (data) in the tree ([path->blob]).
+- `entity` is similar to `blob`, but unlike blobs, entities do have an identity (encoded their `id`). In git there isn't as much an "identity of a file", this is recorded as the entry of the blob (data) in the tree ([path->blob]).
 - `revision` (could be renamed `branch`, `draft` or `variant`) is a combination of `tree` and `commit` and could be compared to a "squashed branch", i.e. a single commit that accumulates changes to one branch.
   - In particular, all of the entity versions linked to a revision are stored as entries in `revision_entity` (which is very similar to a git tree).
 
@@ -83,4 +83,4 @@ Updates currently work as:
 - Upon update, the updated record gets a new version and updated_at set in a pre-update trigger (before save) - (this is returned and will be saved together with the updated data in a single DB write)
 - After update, we make a copy of the old record verbatim
 
-This makes implementation simpler, however at the cost of there not being for a short time a record with (oldid, oldversion) - this means we cannot create/enforce FK constraints to the (id, version) pair in the `revision_entity` table. This is not too problematic because inserts to that table are only done within DB functions and not manually. And we should not delete rows in entity_version (except maybe in garbage collection operations).
+This makes implementation simpler, however at the cost of there not being for a short time a record with (oldid, oldversion) - this means we cannot create/enforce FK constraints to the (id, version) pair in the `revision_entity` table. This is not too problematic because inserts to that table are only done within DB functions and not manually. And we should not delete rows in entity (except maybe in garbage collection operations).

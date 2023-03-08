@@ -1,4 +1,11 @@
-create table if not exists entity_version (
+--- extensions ---
+create extension if not exists ltree;
+
+
+-- entities (versioned)
+
+drop table if exists entity;
+create table if not exists entity (
     id text not null,
     version uuid not null default gen_random_uuid(),
     updated_at timestamp not null default now(),
@@ -7,38 +14,80 @@ create table if not exists entity_version (
     constraint entity_unique_id_version unique (id, version)
 );
 
-create index if not exists entity_version_updated
-    on entity_version
+create index if not exists entity_id
+    on entity
+    using btree(id);
+
+create index if not exists entity_updated
+    on entity
     using btree(updated_at desc);
 
-create index if not exists entity_version_data
-    on entity_version
+create index if not exists entity_data
+    on entity
     using gin(data);
 
+
+-- relations (versioned)
+
+drop table if exists relation;
+create table if not exists relation (
+    id serial,
+    version uuid not null default gen_random_uuid(),
+    updated_at timestamp not null default now(),
+    type text not null,
+    path ltree not null,
+    -- entity_id reference check should be done on a before insert trigger
+    entity_id text not null, -- references entity(id) on delete cascade,
+    constraint relation_unique_id_version unique nulls not distinct (id, version),
+    constraint relation_no_duplicates unique nulls not distinct (type, path, entity_id)
+);
+
+create index if not exists relation_path_idx
+    on relation
+    using btree(path);
+
+-- specialised index for tree operations:
+create index if not exists relation_path_gist_idx
+    on relation
+    using gist(path);
+
+
+-- revisions (i.e. sets of related entity versions)
+
+drop table if exists revision;
 create table if not exists revision (
     id uuid primary key not null default gen_random_uuid(),
     parent uuid references revision(id),
-    name text,
+    name text
 );
 
+drop table if exists revision_entity;
 create table if not exists revision_entity (
     revision_id uuid not null references revision(id) on delete cascade,
+    -- entity_id reference check should be done on a before insert trigger
+    -- FK constraint to entity(id, version) cannot ATM be enforced due to how
+    -- we create new versions in pre-update triggers, where it temporarily
+    -- fails - even deferrable foreign keys won't work unless we figure out how
+    -- to do versioning in only the pre-trigger step.
     entity_id text not null,
-    entity_version uuid not null
+    entity_version uuid not null,
+    -- foreign key (entity_id, entity_version) references (id, version) deferrable
+    constraint revision_entity_unique unique (revision_id, entity_id)
 );
 
 
 --- functions and triggers ---
 
 -- create new version (to be called by trigger)
-create or replace function generate_new_version_id() returns trigger
+-- generic, will work for both entity and relation
+create or replace function set_new_version_id() returns trigger
 as $$
 begin
     -- do not allow updating version directly
-    IF OLD.version != NEW.version THEN
-        RAISE EXCEPTION 'Must not manually update version.';
-        RETURN NULL;
-    END IF;
+    if OLD.version != NEW.version then
+        raise exception 'must not manually set version.';
+        return null;
+    end if;
 
     NEW.version = gen_random_uuid();
     NEW.updated_at = now();
@@ -49,42 +98,66 @@ $$ language plpgsql;
 create or replace function keep_old_version() returns trigger
 as $$
 begin
-    insert into entity_version values (OLD.*);
+    execute
+        'INSERT INTO '
+        || quote_ident(TG_TABLE_NAME)
+        || ' values ($1.*)'
+        USING OLD;
+    -- execute format('insert into %I values %s', TG_TABLE_NAME, OLD.*);
+    -- insert into TG_TABLE_NAME values (OLD.*);
     return NEW;
 end;
 $$ language plpgsql;
 
-drop trigger if exists pre_versioning on entity_version;
+
+drop trigger if exists pre_versioning on entity;
 create trigger pre_versioning
-    before update on entity_version
+    before update on entity
     for each row
     when (NEW.* is distinct from OLD.*)
-    execute function generate_new_version_id();
+    execute function set_new_version_id();
 
-drop trigger if exists post_versioning on entity_version;
+drop trigger if exists post_versioning on entity;
 create trigger post_versioning
-    after update on entity_version
+    after update on entity
     for each row
     when (NEW.version is distinct from OLD.version)
     execute function keep_old_version();
 
-create or replace function latest_entity_version(source_id text)
-returns setof entity_version
+
+drop trigger if exists pre_versioning on relation;
+create trigger pre_versioning
+    before update on relation
+    for each row
+    when (NEW.* is distinct from OLD.*)
+    execute function set_new_version_id();
+
+drop trigger if exists post_versioning on relation;
+create trigger post_versioning
+    after update on relation
+    for each row
+    when (NEW.version is distinct from OLD.version)
+    execute function keep_old_version();
+
+
+
+create or replace function latest_entity(source_id text)
+returns setof entity
 as $$
-    select * from entity_version
+    select * from entity
     where id = source_id
     order by updated_at desc
     limit 1;
 $$ language sql;
 
-create or replace function latest_entity_versions()
-returns setof entity_version
+create or replace function latest_entities()
+returns setof entity
 as $$
-select
-    distinct on (id)
-    *
-from entity_version
-order by id, updated_at desc;
+    select
+        distinct on (id)
+        *
+    from entity
+    order by id, updated_at desc;
 $$ language sql;
 
 
@@ -109,10 +182,10 @@ $$ language plpgsql;
 
 
 create or replace function revision_entities(branch_revision uuid)
-returns setof entity_version
+returns setof entity
 as $$
     select e.*
-    from entity_version e
+    from entity e
     join revision_entity re
         on re.entity_id = e.id
         and re.entity_version = e.version
@@ -134,7 +207,7 @@ as $$
         and entity_id = source_entity_id
     ),
     new_version as (
-        update entity_version
+        update entity
         set data[field]=value
         where (id, version) in (
             select entity_id, entity_version from old_version
@@ -152,14 +225,9 @@ $$ language sql;
 
 --- Example queries/updates
 
--- populate versioned from non-versioned entities
-
-insert into entity_version (id, type, data)
-select id, type, data from entity;
-
 -- updates that will create new versions:
 
-update entity_version
+update entity
 set data['mastery']= '"some"'
 where
     id='me'
@@ -190,20 +258,23 @@ from
 select
     distinct on (id)
     id, version, updated_at, data
-from entity_version
+from entity
 order by id, updated_at desc;
 
 
 --- create initial "main" revision with current latest versions
 
-insert into revision (id) values (gen_random_uuid());
+insert into revision (name) values ('main');
 
 with
 entities as (
-    select id, version from latest_entity_versions()
+    select id, version from latest_entities()
+),
+main_branch as (
+    select id as revision_id from revision where name = 'main'
 )
 insert into revision_entity (revision_id, entity_id, entity_version)
-select '98f18a8c-085b-4163-bc3e-798ce66dfc78', id, version from entities;
+select revision_id, id, version from entities, main_branch;
 
 
 -- update an object in a revision
