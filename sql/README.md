@@ -4,6 +4,8 @@ The simplest model uses two abstractions: one for entities and one for relations
 
 Optional extensions to the model include versioning and catalogs (for property values).
 
+`schema.sql` is the simple non-versioned model.
+
 ## Entities
 
 Entities have an `id`, a `type` (text) and free-form `data` (jsonb).
@@ -20,7 +22,7 @@ Relations have an `id`, a `type`, a `path` and an `entity_id` (the _target_ of t
 
 `path` is the full hierarchical path to the _source_ entity of the relationship (although relations are not necessarily directional, so I'm using source and target rather arbitrarily here).
 
-> DB table is currently called `hierarchy`.
+> DB table is called `hierarchy` (renamed as `relation` in `versioning.sql`).
 
 The id is currently there only for simpler addressability, but maybe a preserved "identity" can emerge later if we add qualifying data/metadata to relationships. E.g. a "position" in Ourspace could be a qualified relationship between team and person objects with additional data (dates, roles...).
 
@@ -45,12 +47,15 @@ Catalogs allow us to keep a meaningful property value in the entity that can be 
 
 ## Versioning
 
+`versioning.sql`
+
 Versioning is inspired by git but is a simpler model, intended to handle "branches" that are drafts, but within a branch there is no concept of multiple commits (ATM) as individual addressable operations. So multiple versions of an entity within a branch are not recorded ATM. They could be reconstructed by recording a linear sequence of change events that contain the individual changes.
 
 [Versioning](./versioning.sql) includes:
 
-- Additions to `entity` (versioned entity): Enitities that have an id `plus` a `version` (new versions generated automatically upon update using "copy on save"), intended to replace `entity`.
--
+- Additions to `entity` and `relation`: versioned entities now have an additional `version` (new versions generated automatically upon update using "copy on save"), and `id` is no longer unique - now it's unique on `(id, version)`.
+- A `revision` as a way to name a set of versioned entities (only a `name`, an `id` and a `parent`)
+- A list of entity versions for a revision in `revision_entity`
 
 Parallels with the `git` model:
 
